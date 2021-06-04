@@ -1,142 +1,188 @@
 <?php
-    #$database = new SQLite3('students.db');
-    #$q = "select  g.direction, a.direction as 'institute', a.surname,a.name,a.lastname, a.gender, a.date_of_birth, a.student_card from groups g inner join
-    #(select s.surname, s.name, s.lastname, s.date_of_birth,case when s.sex = 1 then 'male' else 'female' end as 'gender', s.student_card,  d.direction, s.id from students s inner join directions d on s.direction_id = d.id) a
-    #on g.student_id = a.id order by g.direction, a.surname";
-    #$data = $database->query($q);
+$db = new PDO('sqlite:masters.db');
+$sql_query = "SELECT masters.id AS 'master_id',
+        masters.last_name || ' ' || masters.first_name || ' ' || masters.patronymic AS 'master',
+       completed_services.date AS 'date',
+       services.name AS 'service_name',
+       services_by_car_class.price AS 'price'
+FROM completed_services
+         INNER JOIN masters
+                    ON completed_services.master_id = masters.id
+         INNER JOIN services
+                    ON completed_services.service_id = services.id
+         INNER JOIN service_reservation
+                    ON service_reservation.service_id = completed_services.service_id AND service_reservation.master_id = completed_services.master_id
+         INNER JOIN services_by_car_class
+                    ON services_by_car_class.car_class_id = service_reservation.car_class_id AND services_by_car_class.service_id = completed_services.service_id \n";
+$sql_q = $sql_query . "ORDER BY 'master' ";
+$st = $db->prepare($sql_q);
+$st->execute();
 
-    $database = new PDO('sqlite:students.db');
-    $q = "select  g.direction, a.direction as 'institute', a.surname,a.name,a.lastname, a.gender, a.date_of_birth, a.student_card from groups g inner join
-    (select s.surname, s.name, s.lastname, s.date_of_birth,case when s.gender = 1 then 'male' else 'female' end as 'gender', s.student_card,  d.direction, s.id from students s inner join directions d on s.direction_id = d.id) a
-     on g.student_id = a.id order by g.direction, a.surname";
-    #$data = $database->prepare($q);
-    #$data->execute();
-    #$res = $data->fetchAll(PDO::FETCH_ASSOC);
+$all_services = $st->fetchAll(PDO::FETCH_ASSOC);
+$sql_master_id = 'SELECT distinct masters.id as id from masters order by id;';
+$all_services_by_master = $db->prepare($sql_master_id);
+$all_services_by_master->execute();
+$res = $all_services_by_master->fetchAll(PDO::FETCH_ASSOC);
+$array_services = array();
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>LAB7</title>
-
+    <title>Выполненые услуги</title>
     <style>
-        table {
-            margin: 0 auto;
-            font-size: large;
-            border: 1px solid black;
+        body{
+            background-color: whitesmoke;
         }
-
-        h1 {
+        h1{
+            font-family: 'Courier New', Courier, monospace ;
+            font-size: 20px;
+            font-weight: bolder;
+        }
+        table{
+            border: 1px solid black;
+            font-family: 'Courier New', Courier, monospace ;
+            padding: 8px;
+        }
+        td{
             text-align: center;
-            color: #006600;
-            font-size: xx-large;
-            font-family: 'Gill Sans', 'Gill Sans MT',
-            ' Calibri', 'Trebuchet MS', 'sans-serif';
-        }
-
-        td {
-            background-color: #E4F5D4;
             border: 1px solid black;
+            font-family: 'Courier New', Courier, monospace ;
+            padding: 4px;
+        }
+        input,
+        select{
+            padding: .50rem 1rem .50rem .50rem;
+            background: none;
+            border: 1px solid #ccc;
+            border-radius: 2px;
+            font-family: inherit;
+            font-size: 1rem;
+            color: #444;
+
+        }
+        option{
+            font-family: inherit;
+            font-size: 1rem;
+            color: #444;
+            border: 1px solid #ccc;
+        }
+        hr{
+            padding: 3;
+            height: 2px;
+            border: none;
+            background: linear-gradient(45deg, #333, #ddd);
         }
 
-        th,
-        td {
-            font-weight: bold;
-            border: 1px solid black;
-            padding: 10px;
-            text-align: center;
-        }
-
-        td {
-            font-weight: lighter;
-        }
     </style>
+
 </head>
 <body>
-<form action="" method="post">
-    <select name="group">
-        <option value="" disabled selected>Choose a group</option>
-        <?php $data = $database->prepare("select direction from groups group by groups.direction");
-        $data ->execute();
-        $row = $data->fetchAll(PDO::FETCH_ASSOC);
-        foreach ($row as $r){
-            foreach ($r as $a){
-                ?>
-                #print_r($a." ");
-                <option value="<?=$a?>"><?=$a?></option>
-        <?php
-            }
-        }
-        ?>
-        <option>All students</option>
-    </select>
+<h1>Выполненые услуги по конкетному мастеру</h1>
 
-    <input type="submit" name="submit" vlaue="Choose options">
-</form>
-<?php
-$selected = 0;
-if(isset($_POST['submit'])){
-    if(!empty($_POST['group'])) {
-        $selected = $_POST['group'];
-        #echo 'You have chosen: ' . $selected;
-    } else {
-        echo "You haven't chosen a value.\nNow you're watching the full table. Choose a group again :) ";
-    }
-}
-?>
 <section>
-    <h1>students</h1>
-    <!-- TABLE CONSTRUCTION-->
-    <table id = "student_table">
-        <tr>
-            <th>group</th>
-            <th>institute</th>
-            <th>surname</th>
-            <th>name</th>
-            <th>lastname</th>
-            <th>gender</th>
-            <th>date of birth</th>
-        </tr>
+    <hr>
+    <form action="" method="POST">
+        <label>
+            <select style="width: 200px;" name="master_id">
+                <option>Все услуги
 
-        <!-- CREATE QUERIES -->
+                </option>
+                <?php foreach($res as $key => $idObject): ?>
+                    <option value=<?= $idObject['id']; ?>>
+                        <?= $idObject['id']; ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </label>
+        <button type="submit">Search by ID</button>
+    </form>
+    <hr>
+    <?php
+    if( $_POST["master_id"]){
+        $master = $_POST["master_id"];
+        ?>
+        <table>
+        <tbody>
+        <tr style= "background-color: SteelBlue;
+                    font-weight: bold;
+                    font-size: 16px;">
+            <td>id</td>
+            <td>ФИО</td>
+            <td>Дата услуги</td>
+            <td>Название услуги</td>
+            <td>Стоимость</td>
+        </tr>
         <?php
-        if($selected == "All students" or empty($_POST['group'])){
-            $q = "select  g.direction, a.direction as 'institute', a.surname,a.name,a.lastname, a.gender, a.date_of_birth, a.student_card from groups g inner join
-            (select s.surname, s.name, s.lastname,s.student_card, s.date_of_birth, case when s.gender = 1 then 'male' else 'female' end as 'gender',  d.direction, s.id from students s inner join directions d on s.direction_id = d.id) a
-            on g.student_id = a.id order by g.direction, a.surname";
-            $data = $database->prepare($q);
-            $data->execute();
-        }else {
-            $q = "select  g.direction, a.direction as 'institute', a.surname,a.name, a.lastname, a.gender, a.date_of_birth, a.student_card from groups g 
-    inner join (select s.surname, s.name, s.lastname, s.date_of_birth, case when s.gender = 1 then 'male' else 'female' end as 'gender', s.student_card, 
-                       d.direction, s.id from students s inner join directions d on s.direction_id = d.id) a
-    on g.student_id = a.id 
-    where g.direction = '$selected'order by g.direction, a.surname ";
-            $data = $database->prepare($q);
-            $data->execute();
-        }
-        $rows=$data->fetchAll(PDO::FETCH_ASSOC);
-        #print_r($rows);
-        foreach($rows as $row)
-        {
+        if($master!="Все услуги"){
+            $sql_query1 = "SELECT masters.id AS 'master_id',
+        masters.last_name || ' ' || masters.first_name || ' ' || masters.patronymic AS 'master',
+        completed_services.date AS 'date',
+        services.name AS 'service_name',
+        services_by_car_class.price AS 'price'
+        FROM completed_services
+         INNER JOIN masters
+                    ON completed_services.master_id = masters.id
+         INNER JOIN services
+                    ON completed_services.service_id = services.id
+         INNER JOIN service_reservation
+                    ON service_reservation.service_id = completed_services.service_id AND service_reservation.master_id = completed_services.master_id
+         INNER JOIN services_by_car_class
+                    ON services_by_car_class.car_class_id = service_reservation.car_class_id AND services_by_car_class.service_id = completed_services.service_id
+         WHERE masters.id = '$master'
+         ORDER BY  'master' ";
+            //$sql_find_services_by_master = $sql_query1 . " ORDER BY 'master', 'date'";
+            $st_master = $db->prepare($sql_query1);
+            $st_master->execute();
+            $results_st_master = $st_master->fetchAll(PDO::FETCH_ASSOC);
+            foreach($results_st_master as $res_string){
+                $value1 = sprintf(" %' -4d\t", $res_string['master_id']);
+                $value2 = sprintf(" %' -56s\t", $res_string['master']);
+                $value3 = sprintf(" %' -15s\t", $res_string['date']);
+                $value4 = sprintf(" %' -13s\t", $res_string['service_name']);
+                $value5 = sprintf(" %' -20s\t", $res_string['price']);
+                ?>
+                <tr style=" background-color: LightSkyBlue;
+                        font-size: 14px;">
+                    <td><?=$value1;?></td>
+                    <td><?=$value2;?></td>
+                    <td><?=$value3;?></td>
+                    <td><?=$value4;?></td>
+                    <td><?=$value5;?></td>
+                </tr>
+                <?php
+            }
             ?>
-            <tr>
-                <!--FETCHING DATA FROM EACH
-                    ROW OF EVERY COLUMN-->
-                <td><?= $row['direction'];?></td>
-                <td><?= $row['institute'];?></td>
-                <td><?= $row['surname'];?></td>
-                <td><?= $row['name'];?></td>
-                <td><?= $row['lastname'];?></td>
-                <td><?= $row['gender'];?></td>
-                <td><?= $row['date_of_birth'];?></td>
-            </tr>
+            </tbody>
+            </table>
             <?php
         }
-        ?>
-    </table>
+        else{
+            foreach($all_services as $res_string){
+                $value1 = sprintf(" %' -4d\t", $res_string['master_id']);
+                $value2 = sprintf(" %' -56s\t", $res_string['master']);
+                $value3 = sprintf(" %' -15s\t", $res_string['date']);
+                $value4 = sprintf(" %' -13s\t", $res_string['service_name']);
+                $value5 = sprintf(" %' -20s\t", $res_string['price']);
+                ?>
+                <tr style=" background-color: LightSkyBlue;
+                        font-size: 14px;">
+                    <td><?=$value1;?></td>
+                    <td><?=$value2;?></td>
+                    <td><?=$value3;?></td>
+                    <td><?=$value4;?></td>
+                    <td><?=$value5;?></td>
+                </tr>
+                <?php
+            }
+            ?>
+            </tbody>
+            </table>
+            <?php
+        }
+    }
+    ?>
+    <hr>
 </body>
 </html>
-
-

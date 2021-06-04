@@ -1,125 +1,145 @@
 <?php
-#-----OPEN DB and CREATE QUERY-----
-$db = new PDO('sqlite:students.db');
-$q = "SELECT distinct direction as dir from groups order by direction;";
-$groups = $db->prepare($q);
-$groups->execute();
-$res = $groups->fetchAll(PDO::FETCH_ASSOC);
 
-$r = iconv('CP866', 'utf-8',chr(197));
-$r2 = iconv('CP866', 'utf-8',chr(196));
-$r3 = iconv('CP866', 'utf-8',chr(179));
-$g1 = iconv('CP866', 'utf-8',chr(218));
-$g2 = iconv('CP866', 'utf-8',chr(194));
-$g3 = iconv('CP866', 'utf-8',chr(191));
-$lg = iconv('CP866', 'utf-8',chr(195));
-$rg = iconv('CP866', 'utf-8',chr(180));
-$gb1 = iconv('CP866', 'utf-8',chr(192));
-$gb2 = iconv('CP866', 'utf-8',chr(193));
-$gb3 = iconv('CP866', 'utf-8',chr(217));
-$p = iconv('CP866', 'utf-8',chr(32));
+$pdo = new PDO('sqlite:masters.db');
 
-$split_str = "\n".$lg.str_repeat($r2, 7).$r.str_repeat($r2, 39).$r.str_repeat($r2, 15).$r.str_repeat($r2, 15).$r.str_repeat($r2, 15).$r.str_repeat($r2, 3).$r.str_repeat($r2, 12).$r.str_repeat($r2, 9).$rg."\n";
-$top_split = "\n".$g1.str_repeat($r2, 7).$g2.str_repeat($r2, 39).$g2.str_repeat($r2, 15).$g2.str_repeat($r2, 15).$g2.str_repeat($r2, 15).$g2.str_repeat($r2, 3).$g2.str_repeat($r2, 12).$g2.str_repeat($r2, 9).$g3."\n";
-$bottom_split = "\n".$gb1.str_repeat($r2, 7).$gb2.str_repeat($r2, 39).$gb2.str_repeat($r2, 15).$gb2.str_repeat($r2, 15).$gb2.str_repeat($r2, 15).$gb2.str_repeat($r2, 3).$gb2.str_repeat($r2, 12).$gb2.str_repeat($r2, 9).$gb3."\n";
+$query_base = "SELECT masters.id AS 'master_id',
+        masters.last_name || ' ' || masters.first_name || ' ' || masters.patronymic AS 'master',
+       completed_services.date AS 'date',
+       services.name AS 'service_name',
+       services_by_car_class.price AS 'price'
+FROM completed_services
+         INNER JOIN masters
+                    ON completed_services.master_id = masters.id
+         INNER JOIN services
+                    ON completed_services.service_id = services.id
+         INNER JOIN service_reservation
+                    ON service_reservation.service_id = completed_services.service_id AND service_reservation.master_id = completed_services.master_id
+         INNER JOIN services_by_car_class
+                    ON services_by_car_class.car_class_id = service_reservation.car_class_id AND services_by_car_class.service_id = completed_services.service_id \n";
 
+$query = $query_base . " ORDER BY 'master', 'date'";
 
-echo "\n".$g1.str_repeat($r2, 10).$g3."\n";
-echo $r3."All groups".$r3;
-$array_groups = array();
-foreach($res as $res_string)
-{
-    array_push($array_groups, $res_string['dir']);
-    $value1 = sprintf("  %' -8d", $res_string['dir']);
-    echo "\n".$lg.str_repeat($r2, 10).$rg."\n";
-    echo $r3.$value1.$r3;
+$statement = $pdo->query($query);
+$rows = $statement->fetchAll();
+draw_table($rows);
+$statement->closeCursor();
+
+$query_master_id = "SELECT id AS 'master_id',
+        last_name || ' ' || first_name || ' ' || patronymic AS 'master'
+        FROM masters";
+
+$statement = $pdo->query($query_master_id);
+$masters_id = $statement->fetchAll();
+draw_table($masters_id);
+$statement->closeCursor();
+
+$check_id = readline("id мастера: ");
+
+if (!id_validation($check_id, $masters_id)) {
+    echo "\n Мастера с таким id не существует \n";
+} else {
+
+    echo "\n";
+    $master_query = $query_base . "WHERE masters.id = :check_id
+                                   ORDER BY 'master', 'date' ";
+
+    $statement = $pdo->prepare($master_query);
+    $statement->execute(['check_id' => $check_id]);
+    $rows = $statement->fetchAll();
+
+    if (!empty($rows))
+        draw_table($rows);
+    else echo "Информации об оказанных услугах этого мастера нет \n\n";
+    $statement->closeCursor();
 }
 
-echo "\n".$gb1.str_repeat($r2, 10).$gb3."\n";
+function draw_table($table) {
 
-$group_number = "";
+    $columns_count = count($table[0])/2;
+    $max_column_length = new SplFixedArray($columns_count);
+    $columns_names = new SplFixedArray($columns_count);
+    $table_width = 0;
 
-while($group_number!="escape"){
-    echo "\nEnter group's number: ";
-    $group_number = "";
-    fscanf(STDIN, "%s", $group_number);
-    if(ctype_digit($group_number)){
-        if (in_array($group_number, $array_groups)){
-            $q = "select  g.direction as 'g_num', 
-                    a.direction as 'institute', 
-                    a.surname,a.name, a.lastname, a.g, a.date_of_birth , a.student_card
-                    from groups g 
-                    inner join (select s.surname, s.name, s.lastname, s.date_of_birth, s.student_card,
-                               s.gender as 'g',  
-                                d.direction, s.id from students s inner join directions d on s.direction_id = d.id) a
-                  on g.student_id = a.id 
-                  where g.direction = '$group_number'order by g.direction, a.surname;";
-            $st_gr = $db->prepare($q);
-            $st_gr->execute();
-            $result = $st_gr->fetchAll(PDO::FETCH_ASSOC);
-            #$result = $st_gr->fetchAll(PDO::FETCH_ASSOC);
-            echo $top_split;
-            $counter = 0;
-            foreach($result as $res)
-            {
-                $value1 = sprintf(" %' -4d\t", $res['g_num']);
-                $value2 = sprintf(" %' -56s\t", $res['institute']);
-                $value3 = sprintf(" %' -15s\t", $res['surname']);
-                $value4 = sprintf(" %' -13s\t", $res['name']);
-                $value5 = sprintf(" %' -20s\t", $res['lastname']);
-                $value6 = sprintf(" %' -2d", $res['g']);
-                $value7 = sprintf(" %' -11s", $res['date_of_birth']);
-                $value8 = sprintf(" %' -8d", $res['student_card']);
-                echo $r3,$value1,$r3, $value2,$r3, $value3,$r3, $value4,$r3, $value5,$r3, $value6,$r3, $value7,$r3,$value8, $r3;
-                if(++$counter==count($result)){
-                    echo $bottom_split;
-                }
-                else{
-                    echo $split_str;
-                }
+    for ($i = 0; $i < $columns_count*2; $i+=2){
+        $columns_names[$i/2] = array_keys($table[0])[$i];
+        $max_column_length[$i/2] = iconv_strlen(array_keys($table[0])[$i]);
+    }
 
+    foreach ($table as $row) {
+        for ($i=0; $i<$columns_count; $i++) {
+            if (iconv_strlen($row[$i]) > $max_column_length[$i]) {
+                $max_column_length[$i] = iconv_strlen($row[$i]);
             }
         }
-        else{
-            echo "There isn't any group with that name\n";
-        }
     }
-    else if($group_number==""){
-        $q = "select  g.direction as 'num', a.direction as 'institute', a.surname,a.name,a.lastname, a.g, a.date_of_birth,a.student_card 
-                  from groups g inner join
-                 (select s.surname, s.name, s.lastname,s.student_card, s.date_of_birth, 
-                         s.gender as 'g',  
-                         d.direction, s.id from students s inner join directions d on s.direction_id = d.id) a
-                  on g.student_id = a.id order by g.direction, a.surname;";
 
-        $st = $db->prepare($q);
-        $st->execute();
-        $results = $st->fetchAll(PDO::FETCH_ASSOC);
-
-        echo $top_split;
-        $counter = 0;
-        foreach($results as $res){
-            $value1 = sprintf(" %' -4d\t", $res['num']);
-            $value2 = sprintf(" %' -56s\t", $res['institute']);
-            $value3 = sprintf(" %' -15s\t", $res['surname']);
-            $value4 = sprintf(" %' -13s\t", $res['name']);
-            $value5 = sprintf(" %' -20s\t", $res['lastname']);
-            $value6 = sprintf(" %' -2d", $res['g']);
-            $value7 = sprintf(" %' -11s", $res['date_of_birth']);
-            $value8 = sprintf(" %' -8d", $res['student_card']);
-            echo $r3,$value1,$r3, $value2,$r3, $value3,$r3, $value4,$r3, $value5,$r3, $value6,$r3, $value7,$r3,$value8, $r3;
-            if(++$counter==count($results)){
-                echo $bottom_split;
-            }
-            else{
-                echo $split_str;
-            }
-        }
-
+    for ($i = 0; $i < $columns_count; $i++){
+        $table_width += $max_column_length[$i] + 2;
     }
-    else if($group_number!="escape"){
-        echo "Oops! Something's wrong >_<";
+
+    empty_line($columns_count, $max_column_length, 1);
+    line_with_data($columns_count, $max_column_length, $columns_names);
+    empty_line($columns_count, $max_column_length, 2);
+
+    for ($i = 0; $i < count($table); $i++){
+        line_with_data($columns_count, $max_column_length, $table[$i]);
     }
+
+    empty_line($columns_count, $max_column_length, 3);
 
 }
-?>
+
+function empty_line($columns_count, $max_column_length, $mode){
+    $middle_sep = '';
+    $start_sep = '';
+    $end_sep = '';
+
+    switch ($mode){
+        case 1:
+            $middle_sep = "┬";
+            $start_sep = '┌';
+            $end_sep = '┐';
+            break;
+
+        case 2:
+            $middle_sep = "┼";
+            $start_sep = '├';
+            $end_sep = '┤';
+            break;
+
+        case 3:
+            $middle_sep = "┴";
+            $start_sep = '└';
+            $end_sep = '┘';
+            break;
+    }
+
+    print_r($start_sep);
+    for ($i = 0; $i < $columns_count; $i++){
+        if ($i != $columns_count-1)
+            print_r(str_repeat('─', $max_column_length[$i]+2) . $middle_sep );
+        else
+            print_r(str_repeat('─', $max_column_length[$i]+2) . $end_sep );
+    }
+    print_r("\n");
+}
+
+function line_with_data($columns_count, $max_column_length, $data){
+    print_r("│");
+
+    for ($i = 0; $i < $columns_count; $i++){
+        $space_count = $max_column_length[$i]+1 - iconv_strlen($data[$i]);
+        print_r(" " . $data[$i] . str_repeat(' ', $space_count) . "│");
+    }
+    print_r("\n");
+}
+
+function id_validation($id, $database){
+    if (!is_numeric($id)) return FALSE;
+
+    foreach ($database as $rows){
+        if ($rows['master_id'] == $id) return True;
+    }
+
+    return FALSE;
+}
